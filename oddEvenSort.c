@@ -1,34 +1,45 @@
-#include "mpi.h"
+
+
+
+
+
+
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
 #include <stdlib.h>
+#include <limits.h>
+
+#include <mpi.h>
 
 typedef int bool;
 #define true 1
 #define false 0
 //can instead write a pass by reference NOT method (bool' = !bool)
 
-void generateMyRandomList(long long int* vec, long long int length, long long int maxVal) {
-    vec = malloc(length * sizeof(long long int));
+long long int* generateMyRandomList(long long int length, long long int maxVal) {
+	long long int* vec = malloc(length * sizeof(long long int));
     int i;
     for (i = 0; i < length; i++) {
 		vec[i] = maxVal * rand();
     }
+    return vec;
 }
 
 
 //totalListSize = length(vector) * totalprocs
-void generateMyNearRandomList(long long int* vec, long long int length, int myRank, int totalprocs)
+long long int* generateMyNearRandomList( long long int length, int myRank, int totalprocs)
 {
 	//Start and end mark the range of the function.
 	long long int start =  length * myRank;
 	long long int end =  length * (myRank + 1);
-	vec = malloc(length * sizeof(long long int));
+	long long int* vec = malloc(length * sizeof(long long int));
+
 	int i;
 	for(i = start; i < end; i++){
 		vec[i] = start + (end - start) * rand();
 	}
+	return vec;
 }
 
 /*
@@ -217,7 +228,7 @@ int main(int argc, char *argv[])
 {
 
 	//Seed random # gen
-	srand(time(NULL));
+	srand(time((void *) 0);//null pointer
 
     double startwtime, endwtime;
     int  namelen, myRank, totalprocs;
@@ -236,7 +247,7 @@ int main(int argc, char *argv[])
 
 	long long int* localData;//Array containing the data to be sorted
 	long long int size;// = n, the total number of numbers to be sorted, also the size of all localData concatenated
-	long long int maxVal; //The largest value that any n can obtain
+	long long int maxVal = LLONG_MAX; //The largest value that any n can obtain
 
 	long long int mySize;
 	long long int scale;// n/p = n's per p
@@ -250,8 +261,7 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
     MPI_Get_processor_name(processor_name, &namelen);
 
-	odd = myRank % 2;
-	mySize = size / totalprocs;
+
 
 
 	if(myRank == 0 || myRank == totalprocs - 1)
@@ -271,14 +281,21 @@ int main(int argc, char *argv[])
         scanf("%d", &type);
 		printf("Enter the desired size of the vector: \n");
 		scanf("%lld", &size);//lld to scan long long int
-		printf("Enter the max value of a data value(int): \n");
-		scanf("%lld", &maxVal);
+		size += totalprocs - (size % totalprocs);
+		//printf("Enter the max value of a data value(int): \n");
+		//scanf("%lld", &maxVal);
     }
 
 
 	MPI_Bcast(&type, 1, MPI_INT, 0, MPI_COMM_WORLD);//PSOE from MPI_INT being used to represent a bool
     MPI_Bcast(&size, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
-	MPI_Bcast(&maxVal, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
+	//MPI_Bcast(&maxVal, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
+
+	odd = myRank % 2;
+	mySize = size / totalprocs;
+
+
+
 
     startwtime = MPI_Wtime();
 
@@ -287,13 +304,13 @@ int main(int argc, char *argv[])
 
 	if(type == true)//Fully random list
 	{
-		generateMyRandomList(localData, mySize, maxVal);
+		localData = generateMyRandomList(mySize, maxVal);
 	}
 	else
 	{
 		//TODO note that the below will make all localData the same size due the int value of scale
 
-		generateMyNearRandomList(localData, mySize, myRank, totalprocs);
+		localData = generateMyNearRandomList(mySize, myRank, totalprocs);
 	}
 
 	int cycles = 0;
