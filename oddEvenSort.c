@@ -17,16 +17,15 @@ typedef int bool;
 #define false 0
 //can instead write a pass by reference NOT method (bool' = !bool)
 
-long long int* generateMyRandomList(long long int length, long long int maxVal) {
-	long long int* vec = (long long int*)malloc(length * sizeof(long long int));
+void generateMyRandomList(long long int* vec, long long int length) {
+	vec = (long long int*)malloc(length * sizeof(long long int));
     	int i;
 	long long int buf;
     	for (i = 0; i < length; i++) {
-		buf = maxVal * rand();
+		buf = LLONG_MAX * rand();
 		printf("%d/%d:%lld\n",i,length,buf);
 		vec[i] = buf;
     	}
-    	return vec;
 }
 
 
@@ -180,7 +179,7 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 		{
 			memcpy(combinedV, data, mySize * sizeof(long long int));
 			printf("P%d is past first memcpy\n", myRank);
-			memcpy(combinedV + (mySize * sizeof(long long int)),buf, mySize * sizeof(long long int));
+			memcpy(combinedV + mySize,buf, mySize * sizeof(long long int));
 			printf("P%d is past second memcpy, will S&D\n", myRank);
 			sortDivide(combinedV, data, buf, mySize);//not technically necessary to store into buf, but good to track data
 		}
@@ -192,7 +191,7 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 		{
 			memcpy(combinedV, buf, mySize * sizeof(long long int));
 			printf("P%d is past first memcpy\n", myRank);
-			memcpy(combinedV + (mySize * sizeof(long long int)), data, mySize * sizeof(long long int));
+			memcpy(combinedV + mySize, data, mySize * sizeof(long long int));
 			printf("P%d is past second memcpy, will S&D\n", myRank);
 			sortDivide(combinedV, buf, data, mySize);
 		}
@@ -247,8 +246,11 @@ void sortDivide(long long int* z, long long int* a, long long int* b,long long i
 		b[i] = z[i + (length / 2)];
 	}
 	//free(z);
-	printf("After S&D:");
+	printf("After S&D(BOTH):");
 	pv(z,length);
+	printf("After S&D(1st 1/2):");
+	pv(a, length / 2);
+	printf("After S&D(2nd 1/2):");
 }
 
 
@@ -310,7 +312,7 @@ int main(int argc, char *argv[])
 
 	long long int* localData;//Array containing the data to be sorted
 	long long int size;// = n, the total number of numbers to be sorted, also the size of all localData concatenated
-	long long int maxVal = LLONG_MAX; //The largest value that any n can obtain
+//	long long int maxVal = LLONG_MAX; //The largest value that any n can obtain
 
 	long long int mySize;
 	long long int scale;// n/p = n's per p
@@ -344,13 +346,14 @@ int main(int argc, char *argv[])
         scanf("%d", &type);
 		printf("Enter the desired size of the vector: \n");
 		scanf("%lld", &size);//lld to scan long long int
-		size += totalprocs - (size % totalprocs);
+		size += (totalprocs - (size % totalprocs)) * (size % totalprocs != 0);
 		//printf("Enter the max value of a data value(int): \n");
 		//scanf("%lld", &maxVal);
     }
 
-
+	printf("P%d start 1st Bcast\n", myRank);
 	MPI_Bcast(&type, 1, MPI_INT, 0, MPI_COMM_WORLD);//PSOE from MPI_INT being used to represent a bool
+	printf("P%d start 2nd Bcast\n", myRank);
     MPI_Bcast(&size, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
 	//MPI_Bcast(&maxVal, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
 
@@ -361,21 +364,45 @@ int main(int argc, char *argv[])
 
 	
     startwtime = MPI_Wtime();
-	dbg("Started clock", myRank);
+	printf("Started clock,P%d,mySize:%lld\n", myRank,mySize);
 
 	//Since scale doesnt deal with remainders, the next length of all localData's will only = size if size % totalprocs == 0
 
-	if(type == true)//Fully random list
+	if(type == false)//Fully random list
 	{
-		localData = generateMyRandomList(mySize, maxVal);
+		//Tnis is the method that fails
+		//generateMyRandomList(localData,mySize);
+		localData = (long long int*)malloc(mySize * sizeof(long long int));
+    		int i;
+		long long int buff;
+    		for (i = 0; i < mySize; i++) {
+			buff = LLONG_MAX * rand();
+			printf("%d/%d:%lld\n",i,mySize,buff);
+			localData[i] = buff;
+    		}
+
+
 	}
 	else
 	{
 		//TODO note that the below will make all localData the same size due the int value of scale
-
-		localData = generateMyNearRandomList(mySize, myRank, totalprocs);
+		
+		localData = generateMyNearRandomList( mySize, myRank, totalprocs);
+		//Start and end mark the range of the function.
+		long long int start =  mySize * myRank;
+		long long int end =  mySize * (myRank + 1.0);
+		localData = (long long int*)malloc(mySize * sizeof(long long int));
+		long long int buff;
+		int i;
+		for(i = start; i < end; i++){
+			buff = start + ((end - start) * rand());
+			printf("P%d:%d/%d:%lld\n",myRank,i,end,buff);
+			localData[i] = buff;
+		}
 	}
 	dbg("Done gen lists",0);
+	printf("List right after gen:\n");
+	pv(localData, mySize);
 	int cycles = 0;
 	while(cycles < totalprocs) 
 	{
@@ -388,8 +415,11 @@ int main(int argc, char *argv[])
 	long long int* allBuf;
 	long long int allSize = totalprocs * mySize;
 
+
 	if(myRank == 0)
 	{
+		printf("\nSize of allSize:%lld\n", allSize);
+
 		allBuf = (long long int*)malloc(allSize * sizeof(long long int));
 	}
 
@@ -401,9 +431,9 @@ int main(int argc, char *argv[])
 		printf("First 50 values: ");
 		for(i = 0; i < 50 && i < allSize; i++)
 		{
-			printf("%lld, ", allBuf[i]);
+			printf("%lld, ",allBuf[i]);
 		}
-		printf("\nLast 50 values: ");
+		printf("\nLast 50 values: \n");
 		{
 			for(i = allSize - 50; i < allSize && i > 0; i++)
 			{
