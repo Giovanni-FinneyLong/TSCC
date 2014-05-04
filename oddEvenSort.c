@@ -3,7 +3,7 @@
 
 
 
-
+#include <string.h>
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
@@ -18,12 +18,12 @@ typedef int bool;
 //can instead write a pass by reference NOT method (bool' = !bool)
 
 long long int* generateMyRandomList(long long int length, long long int maxVal) {
-	long long int* vec = malloc(length * sizeof(long long int));
-    int i;
-    for (i = 0; i < length; i++) {
+	long long int* vec = (long long int*)malloc(length * sizeof(long long int));
+    	int i;
+    	for (i = 0; i < length; i++) {
 		vec[i] = maxVal * rand();
-    }
-    return vec;
+    	}
+    	return vec;
 }
 
 
@@ -33,7 +33,7 @@ long long int* generateMyNearRandomList( long long int length, int myRank, int t
 	//Start and end mark the range of the function.
 	long long int start =  length * myRank;
 	long long int end =  length * (myRank + 1);
-	long long int* vec = malloc(length * sizeof(long long int));
+	long long int* vec = (long long int*)malloc(length * sizeof(long long int));
 
 	int i;
 	for(i = start; i < end; i++){
@@ -91,18 +91,27 @@ bool isSorted(long long int* data, long long int size)
 
 void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long int* data)
 {
+	printf("Starting transfer for process %d\n", myRank);
+	long long int* buf = (long long int*)malloc(mySize * sizeof(long long int));		
 	if(oddUp)
 	{
 		if(odd)//want to send data to the above process UNLESS we are the cap
 		{//Sending up, receiving from up
 			if(!cap)//because 0 isnt odd
 			{
+				printf("SendStatement1 by %d\n",myRank);
 				sendVector(myRank + 1, mySize, data);
+				printf("Process %d is about to receive\n", myRank);
+				receiveVector(mySize, buf);
+				
 			}
 		}
 		else
 		{
+			printf("SendStatement2 by %d\n",myRank);
 			sendVector(myRank - 1, mySize, data);
+			printf("Process %d is about to receive\n", myRank);
+			receiveVector(mySize, buf);
 
 			//Sending down, receiving from down
 			//No bound issues
@@ -111,9 +120,12 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 	else
 	{
 		if(odd){
-		sendVector(myRank - 1, mySize, data);
+			printf("SendStatement3 by %d\n",myRank);
+			sendVector(myRank - 1, mySize, data);
 			//Sending down, receiving from down
 			//No bound issues
+			printf("Process %d is about to receive\n", myRank);
+			receiveVector(mySize, buf);
 		}
 		else
 		{
@@ -122,24 +134,28 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 			{
 				//can send/receive
 				//sending up, receiving from up
+				printf("SendStatement4 by %d\n",myRank);
 				sendVector(myRank + 1, mySize, data);
+				printf("Process %d is about to receive\n", myRank);
+			
+				receiveVector(mySize, buf);
 			}
 		}
 	}
-	long long int* buf;
+	//long long int* buf;
 
 
-	receiveVector(mySize, buf);
+	//receiveVector(mySize, buf);
+	printf("Done sending and receiving for process %d\n", myRank);
 
-
-	long long int* combinedV = malloc(mySize * 2);
+	long long int* combinedV = (long long int*)malloc(mySize * 2 * sizeof(long long int));
 
 
 
 	memcpy(combinedV, data, mySize);
 	memcpy(combinedV + (mySize * sizeof(long long int)),buf, mySize);
 
-
+	
 
 
 	if((oddUp && odd) || (!oddUp && !odd))
@@ -150,7 +166,7 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 			{
 				memcpy(combinedV, data, mySize);
 				memcpy(combinedV + (mySize * sizeof(long long int)),buf, mySize);
-				sortDivide(combinedV, data, buf);//not technically necessary to store into buf, but good to track data
+				sortDivide(combinedV, data, buf, mySize);//not technically necessary to store into buf, but good to track data
 			}
 
 	}
@@ -196,8 +212,8 @@ Z vector is prefilled, a and b vectors defined but not allocated
 void sortDivide(long long int* z, long long int* a, long long int* b,int length)
 {
 	localSort(z, length);
-	a = malloc((length/2) * sizeof(long long int));
-	b = malloc((length/2) * sizeof(long long int));
+	//a = malloc((length/2) * sizeof(long long int));
+	//b = malloc((length/2) * sizeof(long long int));
 	int i;
 	for (i = 0; i < length /2; i++)
 	{
@@ -212,23 +228,37 @@ void sortDivide(long long int* z, long long int* a, long long int* b,int length)
 
 
 
-void recieveVector(int k, long long int* vector) {
+void receiveVector(int k, long long int* vector) {
    MPI_Status status;
-   vector = malloc(k * sizeof(long long int));
+   vector = (long long int*)malloc(k * sizeof(long long int));
    MPI_Recv(vector, k, MPI_LONG_LONG_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
 }
 
 void sendVector(int sendTo, int k, long long int* vector){
  MPI_Send(vector, k, MPI_LONG_LONG_INT, sendTo, 0, MPI_COMM_WORLD);//TODO double check 0 argument & above)
 }
-
+void dbg(char* in, int rank)
+{
+	if(rank == 0)
+	{
+		printf("DBG:%s\n", in);
+	}
+	else
+	{
+		printf("DBGRNK:%d\n", rank);
+	}
+}
+void p(char* in)
+{
+	dbg(in, 0);
+}
 
 
 int main(int argc, char *argv[])
 {
 
 	//Seed random # gen
-	srand(time((void *) 0);//null pointer
+	srand(time((void *) 0));//null pointer
 
     double startwtime, endwtime;
     int  namelen, myRank, totalprocs;
@@ -296,9 +326,9 @@ int main(int argc, char *argv[])
 
 
 
-
+	
     startwtime = MPI_Wtime();
-
+	dbg("Started clock", myRank);
 
 	//Since scale doesnt deal with remainders, the next length of all localData's will only = size if size % totalprocs == 0
 
@@ -312,13 +342,14 @@ int main(int argc, char *argv[])
 
 		localData = generateMyNearRandomList(mySize, myRank, totalprocs);
 	}
-
+	dbg("Done gen lists",0);
 	int cycles = 0;
 	while(cycles < totalprocs) //set less than p cycles && unordered
 	{
+		printf("Rank:%d Cycle:%d/%d\n", myRank, cycles, totalprocs);
 		oddUp = cycles % 2;
-		transfer(myRank, mySize, oddUp, cap, odd, long long int* localData);
-
+		transfer(myRank, mySize, oddUp, cap, odd, localData);
+		cycles++;
 
 	}
 	long long int* allBuf;
@@ -335,15 +366,15 @@ int main(int argc, char *argv[])
 	{
 		long long int i;
 		printf("First 50 values: ");
-		for(i = 0; i < 50; i++)
+		for(i = 0; i < 50 && i < allSize; i++)
 		{
 			printf("%lld, ", allBuf[i]);
 		}
-		printf("\nLast 50 values: ")
+		printf("\nLast 50 values: ");
 		{
-			for(i = allSize - 50; i < allSize; i++)
+			for(i = allSize - 50; i < allSize && i > 0; i++)
 			{
-				printf("lld, ", allBuf[i]);
+				printf("%lld, ", allBuf[i]);
 			}
 		}
 	}
