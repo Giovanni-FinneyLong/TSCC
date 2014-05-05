@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <mpi.h>
 
-
+#define skip 0
 
 #define err 0   /*set = 1 for error/debug  display*/
 typedef int bool;
@@ -32,7 +32,7 @@ typedef int bool;
 
 
 
-void localSort(long long int* data, int sortSize)
+void localSort(long long int* data, long long int sortSize)
 {
 	/*
 	when done should send a boolean indicating whether it hasChanged
@@ -83,14 +83,14 @@ bool isSorted(long long int* data, long long int size)
 	return true;
 }
 
-void transfer(int myRank, int mySize, int cycle, bool cap, bool odd, long long int* data)
+void transfer(int myRank,long long int mySize, int cycle, bool cap, bool odd, long long int* data)
 {
-//if(err)
-	printf("Starting transfer for process %d, about to allocate buf, mySize=%d, cycle=%d\n", myRank, mySize,cycle);
+if(err)
+	printf("Starting transfer for process %d, about to allocate buf, mySize=%lld, cycle=%d\n", myRank, mySize,cycle);
 	long long int* buf;// = (long long int*)malloc(mySize * sizeof(long long int));
-//if(err)
+if(err)
 	printf("P%d Before transfer for cycle %d\n:", myRank, cycle);
-//if(err)
+if(err)
 	pv(data,mySize);
 	
 	bool doSend = false;
@@ -108,12 +108,13 @@ void transfer(int myRank, int mySize, int cycle, bool cap, bool odd, long long i
 			       // buf = (long long int*)malloc(mySize * sizeof(long long int));
 				
 
-				sendVector(myRank + 1, mySize, data);
-if(err)
-				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank + 1, cycle);
+				//sendVector(myRank + 1, mySize, data);
+
+				//printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank + 1, cycle);
 			        buf = (long long int*)malloc(mySize * sizeof(long long int));
-				receiveVector(myRank + 1,mySize, buf);
-				
+				//receiveVector(myRank + 1,mySize, buf);
+				MPI_Status stat; 	
+				MPI_Sendrecv(data, mySize, MPI_LONG_LONG_INT, myRank + 1,0,buf,mySize, MPI_LONG_LONG_INT, myRank + 1, 0, MPI_COMM_WORLD, &stat);
 			}
 		}
 		else
@@ -124,11 +125,13 @@ if(err)
 				printf("SendStatement2 by %d\n",myRank);
 			       // buf = (long long int*)malloc(mySize * sizeof(long long int));
 
-				sendVector(myRank - 1, mySize, data);
-if(err)
-				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank - 1, cycle);
+				//sendVector(myRank - 1, mySize, data);
+
+				//printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank - 1, cycle);
 			        buf = (long long int*)malloc(mySize * sizeof(long long int));
-				receiveVector(myRank - 1,mySize, buf);
+				//receiveVector(myRank - 1,mySize, buf);
+				MPI_Status stat; 	
+				MPI_Sendrecv(data, mySize, MPI_LONG_LONG_INT, myRank - 1,0,buf,mySize, MPI_LONG_LONG_INT, myRank-1, 0, MPI_COMM_WORLD, &stat);
 			}
 			//Sending down, receiving from down
 			//No bound issues
@@ -140,14 +143,16 @@ if(err)
 			doSend = true;
 			printf("SendStatement3 by %d\n",myRank);
 		       // buf = (long long int*)malloc(mySize * sizeof(long long int));	
-			doSend = true;
-			sendVector(myRank - 1, mySize, data);
+			
+			//sendVector(myRank - 1, mySize, data);
 			//Sending down, receiving from down
 			//No bound issues
-if(err)
-				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank - 1, cycle);
-			        buf = (long long int*)calloc(mySize , sizeof(long long int));
-			receiveVector(myRank - 1,mySize, buf);
+
+			//	printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank - 1, cycle);
+			        buf = (long long int*)malloc(mySize * sizeof(long long int));
+			//receiveVector(myRank - 1,mySize, buf);
+			MPI_Status stat; 	
+			MPI_Sendrecv(data, mySize, MPI_LONG_LONG_INT, myRank-1,0,buf,mySize, MPI_LONG_LONG_INT, myRank-1, 0, MPI_COMM_WORLD, &stat);
 		}
 		else
 		{
@@ -161,13 +166,15 @@ if(err)
 				
 				//can send/receive
 				//sending up, receiving from up
-				printf("SS1 done with buf and about to send\n");
-				sendVector(myRank + 1, mySize, data);
-if(err)
-				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank + 1, cycle);
+			//	printf("SS1 done with buf and about to send\n");
+			//	sendVector(myRank + 1, mySize, data);
+
+			//	printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank + 1, cycle);
 			        buf = (long long int*)malloc(mySize * sizeof(long long int));
+				MPI_Status stat; 	
+				MPI_Sendrecv(data, mySize, MPI_LONG_LONG_INT, myRank + 1,0,buf,mySize, MPI_LONG_LONG_INT, myRank + 1, 0, MPI_COMM_WORLD, &stat);
 			
-				receiveVector(myRank + 1,mySize, buf);
+			//	receiveVector(myRank + 1,mySize, buf);
 			}
 		}
 	}
@@ -186,9 +193,9 @@ if(err)
 
 
 		//receiveVector(mySize, buf);
-//if(err)
+if(err)
 		printf("P%d done receiving for cycle %d, received vector:", myRank, cycle);
-//if(err)
+if(err)
 		pv(buf, mySize);
 
 		long long int* combinedV = (long long int*)malloc(mySize * 2 * sizeof(long long int));
@@ -205,7 +212,7 @@ if(err)
 		if((oddUp && odd) || (!oddUp && !odd))
 		{
 			//TODO put memcpy here and do isSorted test
-			if(!(isSorted(data,mySize) && isSorted(buf,mySize) && data[0] < buf[0]))//else no need to sort or finish exchanging! :D
+			if(!(skip && isSorted(data,mySize) && isSorted(buf,mySize) && data[0] < buf[0]))//else no need to sort or finish exchanging! :D
 
 			{
 				memcpy(combinedV, data, mySize * sizeof(long long int));
@@ -224,7 +231,7 @@ if(err)
 		}
 		else
 		{
-			if(!(isSorted(data,mySize) && isSorted(buf,mySize) && buf[0] < data[0]))//else no need to sort or finish exchanging! :D
+			if(!(skip && isSorted(data,mySize) && isSorted(buf,mySize) && buf[0] < data[0]))//else no need to sort or finish exchanging! :D
 			{
 				memcpy(combinedV, buf, mySize * sizeof(long long int));
 if(err)
@@ -255,7 +262,7 @@ if(err)
 
 		//oddup = !oddup;//need to change oddup in outer loop
 		free(buf);
-//if(err)
+if(err)
 		printf("P%d exiting from transfer\n", myRank);
 	}
 	else
@@ -266,9 +273,9 @@ if(err)
 }
 
 //returns true if they are identical
-bool compareArrays(long long int* a, long long int* b, int length)
+bool compareArrays(long long int* a, long long int* b, long long int length)
 {
-	int i;
+	long long int i;
 	for(i = 0; i < length; i++)
 	{
 		if(a[i] != b[i])
@@ -282,7 +289,7 @@ bool compareArrays(long long int* a, long long int* b, int length)
 Length is the length of z, the combined unsorted array
 Z vector is prefilled, a and b vectors defined but not allocated
 */
-void sortDivide(long long int* z, long long int* a, long long int* b,int length)
+void sortDivide(long long int* z, long long int* a, long long int* b,long long int length)
 {
 if(err)
 	printf("\nBefore S&D:(Length=%d):",length);
@@ -328,13 +335,13 @@ if(err)
 
 
 
-void receiveVector(int source, int k, long long int* vector) {
+void receiveVector(int source, long long int k, long long int* vector) {
    MPI_Status status;
    //vector = (long long int*)malloc(k * sizeof(long long int));
    MPI_Recv(vector, k, MPI_LONG_LONG_INT, source, 0, MPI_COMM_WORLD, &status);
 }
 
-void sendVector(int sendTo, int k, long long int* vector){
+void sendVector(int sendTo, long long int k, long long int* vector){
 
 	MPI_Send(vector, k, MPI_LONG_LONG_INT, sendTo, 0, MPI_COMM_WORLD);//TODO double check 0 argument & above)
 }
@@ -353,7 +360,7 @@ void p(char* in)
 {
 	dbg(in, 0);
 }
-void pv(long long int* v, int l)
+void pv(long long int* v, long long int l)
 {
 	long long int i;
 	printf("[ ");
@@ -388,7 +395,7 @@ int main(int argc, char *argv[])
 	long long int size;// = n, the total number of numbers to be sorted, also the size of all localData concatenated
 //	long long int maxVal = LLONG_MAX; //The largest value that any n can obtain
 
-	int mySize;
+	long long int mySize;
 	long long int scale;// n/p = n's per p
 
 
@@ -399,7 +406,10 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &totalprocs);
     MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
     MPI_Get_processor_name(processor_name, &namelen);
-
+	if(totalprocs == 1)
+	{
+		printf("\n\nCANNOT DO ODD EVEN SORT WITH ONE PROCESS!!!!!\n\n\n");
+	}
 
 
 
@@ -420,7 +430,7 @@ int main(int argc, char *argv[])
         scanf("%d", &type);
 		printf("Enter the desired size of the vector: \n");
 		scanf("%lld", &size);//lld to scan long long int
-		size += (totalprocs - (size % totalprocs)) * (size % totalprocs != 0);
+		size += (totalprocs - (size % totalprocs)) * (size % totalprocs != 0);//for balancing
 		//printf("Enter the max value of a data value(int): \n");
 		//scanf("%lld", &maxVal);
     }
@@ -430,8 +440,8 @@ if(err)
 	MPI_Bcast(&type, 1, MPI_INT, 0, MPI_COMM_WORLD);//PSOE from MPI_INT being used to represent a bool
 if(err)
 	printf("P%d start 2nd Bcast\n", myRank);
-    MPI_Bcast(&size, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
-	//MPI_Bcast(&maxVal, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&size, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);type=type>0?0:type;
+//MPI_Bcast(&maxVal, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
 
 	odd = myRank % 2;
 	mySize = size / totalprocs;
@@ -440,7 +450,7 @@ if(err)
 	sleep(myRank % 3);//So as to get different seeds
 	srand(time(NULL));
     	startwtime = MPI_Wtime();
-	printf("Started clock,P%d,mySize:%d\n", myRank,mySize);
+	printf("Started clock,P%d,mySize:%lld\n", myRank,mySize);
 
 	//Since scale doesnt deal with remainders, the next length of all localData's will only = size if size % totalprocs == 0
 
@@ -449,14 +459,14 @@ if(err)
 		//Tnis is the method that fails
 		//generateMyRandomList(localData,mySize);
 		localData = (long long int*)malloc(mySize * sizeof(long long int));
-    		int i;
+    		long long int i;
 		long long int buff;
     		for (i = 0; i < mySize; i++) {
 			buff = rand() % LLONG_MAX;
 			//buff = ((totalprocs - myRank) * mySize) + i;
 
 if(err)
-			printf("P%d:%d/%d:%lld\n",myRank,i,mySize,buff);
+			printf("P%d:%lld/%lld:%lld\n",myRank,i,mySize,buff);
 			localData[i] = buff;
     		}
 
@@ -472,17 +482,19 @@ if(err)
 		long long int end =  mySize * (myRank + 1.0);
 		localData = (long long int*)malloc(mySize * sizeof(long long int));
 		long long int buff;
-		int i;
+		long long int i;
 		for(i = start; i < end; i++){
 			buff = start + ( rand() % mySize) % LLONG_MAX;
 if(err)
-			printf("P%d:%d/%lld:%lld\n",myRank,i,end,buff);
+			printf("P%d:%lld/%lld:%lld\n",myRank,i,end,buff);
 			localData[i] = buff;
 		}
 	}
 if(err)
 	dbg("Done gen lists",0);
+if(err)
 	printf("P%d list right after gen:\n", myRank);
+if(err)
 	pv(localData, mySize);
 	int cycles = 0;
 	while(cycles < totalprocs) 
@@ -509,6 +521,7 @@ if(err)
 
 	if(myRank == 0)
 	{
+		printf("\n\n\n");
 		long long int i;
 		if(allSize < 51)
 		{
@@ -535,8 +548,10 @@ if(err)
 				printf("%lld ", allBuf[i]);
 			}	
 			printf("]\n");
-		}
-
+		
+}
+		int sorted = isSorted(allBuf,allSize);
+		printf("List sorted = %d\n", sorted);
 	}
 
 
@@ -556,7 +571,7 @@ if(err)
     endwtime = MPI_Wtime();
     MPI_Finalize();
 
-    printf("%f seconds to complete.\n", endwtime - startwtime);
+    printf("Core %d took %f seconds to complete.\n",myRank,  endwtime - startwtime);
 
 
     return 0;
