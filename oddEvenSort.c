@@ -12,11 +12,27 @@
 #include <unistd.h>
 #include <mpi.h>
 
+
+
+#define err 0   /*set = 1 for error/debug  display*/
 typedef int bool;
 #define true 1
 #define false 0
+//used to output ALL debug messages
 
-void localSort(long long int* data, long long int sortSize)
+
+
+
+
+
+
+
+
+
+
+
+
+void localSort(long long int* data, int sortSize)
 {
 	/*
 	when done should send a boolean indicating whether it hasChanged
@@ -25,9 +41,12 @@ void localSort(long long int* data, long long int sortSize)
 	*/
 
 	//TODO remember to make sure that cap cores may not receive anything on a certain semi cycle
+	
 
 	//using bubble sort
+if(err)
 	printf("Before localSort:");
+if(err)
 	pv(data,sortSize);
 	long long int i,j;
 	long long int buf;
@@ -45,7 +64,9 @@ void localSort(long long int* data, long long int sortSize)
 			}
 		}
 }
+if(err)
 	printf("After localSort:");
+if(err)
 	pv(data, sortSize);
 }
 bool isSorted(long long int* data, long long int size)
@@ -62,16 +83,19 @@ bool isSorted(long long int* data, long long int size)
 	return true;
 }
 
-void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long int* data)
+void transfer(int myRank, int mySize, int cycle, bool cap, bool odd, long long int* data)
 {
-	printf("Starting transfer for process %d\n", myRank);
-	long long int* buf;
-        //buf = (long long int*)malloc(mySize * sizeof(long long int));		
-	printf("Done allocatiing buf for p%d\n", myRank);
-	printf("Before transfer:");
+//if(err)
+	printf("Starting transfer for process %d, about to allocate buf, mySize=%d, cycle=%d\n", myRank, mySize,cycle);
+	long long int* buf;// = (long long int*)malloc(mySize * sizeof(long long int));
+//if(err)
+	printf("P%d Before transfer for cycle %d\n:", myRank, cycle);
+//if(err)
 	pv(data,mySize);
 	
 	bool doSend = false;
+	
+	bool oddUp = cycle % 2;
 
 	if(oddUp)
 	{
@@ -79,12 +103,16 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 		{//Sending up, receiving from up
 			if(!cap)//because 0 isnt odd
 			{
-			        buf = (long long int*)malloc(mySize * sizeof(long long int));
 				doSend = true;
 				printf("SendStatement1 by %d\n",myRank);
+			       // buf = (long long int*)malloc(mySize * sizeof(long long int));
+				
+
 				sendVector(myRank + 1, mySize, data);
-				printf("Process %d is about to receive\n", myRank);
-				receiveVector(mySize, buf);
+if(err)
+				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank + 1, cycle);
+			        buf = (long long int*)malloc(mySize * sizeof(long long int));
+				receiveVector(myRank + 1,mySize, buf);
 				
 			}
 		}
@@ -92,12 +120,15 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 		{
 			if(myRank != 0)
 			{
-			        buf = (long long int*)malloc(mySize * sizeof(long long int));
 				doSend = true;
 				printf("SendStatement2 by %d\n",myRank);
+			       // buf = (long long int*)malloc(mySize * sizeof(long long int));
+
 				sendVector(myRank - 1, mySize, data);
-				printf("Process %d is about to receive\n", myRank);
-				receiveVector(mySize, buf);
+if(err)
+				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank - 1, cycle);
+			        buf = (long long int*)malloc(mySize * sizeof(long long int));
+				receiveVector(myRank - 1,mySize, buf);
 			}
 			//Sending down, receiving from down
 			//No bound issues
@@ -106,29 +137,37 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 	else
 	{
 		if(odd){
-		        buf = (long long int*)malloc(mySize * sizeof(long long int));	
 			doSend = true;
 			printf("SendStatement3 by %d\n",myRank);
+		       // buf = (long long int*)malloc(mySize * sizeof(long long int));	
+			doSend = true;
 			sendVector(myRank - 1, mySize, data);
 			//Sending down, receiving from down
 			//No bound issues
-			printf("Process %d is about to receive\n", myRank);
-			receiveVector(mySize, buf);
+if(err)
+				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank - 1, cycle);
+			        buf = (long long int*)calloc(mySize , sizeof(long long int));
+			receiveVector(myRank - 1,mySize, buf);
 		}
 		else
 		{
 			//Sending up, receiving from up
 			if(!cap || myRank == 0)
 			{
-        			buf = (long long int*)malloc(mySize * sizeof(long long int));
-				//can send/receive
 				doSend = true;
-				//sending up, receiving from up
 				printf("SendStatement4 by %d\n",myRank);
+        		//	buf = (long long int*)malloc(mySize * sizeof(long long int));
+				
+				
+				//can send/receive
+				//sending up, receiving from up
+				printf("SS1 done with buf and about to send\n");
 				sendVector(myRank + 1, mySize, data);
-				printf("Process %d is about to receive\n", myRank);
+if(err)
+				printf("Process %d is about to receive from P%d for cycle %d\n", myRank, myRank + 1, cycle);
+			        buf = (long long int*)malloc(mySize * sizeof(long long int));
 			
-				receiveVector(mySize, buf);
+				receiveVector(myRank + 1,mySize, buf);
 			}
 		}
 	}
@@ -147,14 +186,17 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 
 
 		//receiveVector(mySize, buf);
-		printf("P%d done receiving, received vector:", myRank);
+//if(err)
+		printf("P%d done receiving for cycle %d, received vector:", myRank, cycle);
+//if(err)
 		pv(buf, mySize);
 
 		long long int* combinedV = (long long int*)malloc(mySize * 2 * sizeof(long long int));
 	
 
+if(err)
 		dbg("Starting memcpy", myRank);
-		//memcpy(combinedV, data, mySize);
+		//memcpy(combinortDdV, data, mySize);
 		//memcpy(combinedV + (mySize * sizeof(long long int)),buf, mySize);
 		//dbg("DOne with memcpy", myRank);
 	
@@ -167,10 +209,14 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 
 			{
 				memcpy(combinedV, data, mySize * sizeof(long long int));
+if(err)
 				printf("P%d is past first memcpy\n", myRank);
 				memcpy(&combinedV[mySize],buf, mySize * sizeof(long long int));
+if(err)
 				printf("P%d is past second memcpy, will S&D\n", myRank);
+if(err)
 				printf("CombinedV after both copies:");
+if(err)
 				pv(combinedV,mySize * 2);
 				sortDivide(combinedV, data, buf, mySize * 2);//not technically necessary to store into buf, but good to track data
 			}
@@ -181,10 +227,16 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 			if(!(isSorted(data,mySize) && isSorted(buf,mySize) && buf[0] < data[0]))//else no need to sort or finish exchanging! :D
 			{
 				memcpy(combinedV, buf, mySize * sizeof(long long int));
+if(err)
 				printf("P%d is past first memcpy\n", myRank);
 				memcpy(&combinedV[mySize], data, mySize * sizeof(long long int));
+if(err)
 				printf("P%d is past second memcpy, will S&D\n", myRank);
+if(err)
 				printf("CombinedV after both copies:");
+
+
+if(err)
 				pv(combinedV,mySize * 2);
 				sortDivide(combinedV, buf, data, mySize * 2);
 			}
@@ -192,20 +244,23 @@ void transfer(int myRank, int mySize, bool oddUp, bool cap, bool odd, long long 
 
 
 	
+if(err)
 		dbg("Done with memcpys",myRank);
 
 		free(combinedV);
 
+if(err)
 		dbg("Done with first free", myRank);
 	
 
 		//oddup = !oddup;//need to change oddup in outer loop
 		free(buf);
-		dbg("P%d exiting from transfer", myRank);
+//if(err)
+		printf("P%d exiting from transfer\n", myRank);
 	}
 	else
 	{
-		printf("P%d did not need to do anything!!!!!\n");
+		printf("P%d did not need to do anything for cycle %d\n",myRank, cycle);
 	} 
 	
 }
@@ -227,9 +282,11 @@ bool compareArrays(long long int* a, long long int* b, int length)
 Length is the length of z, the combined unsorted array
 Z vector is prefilled, a and b vectors defined but not allocated
 */
-void sortDivide(long long int* z, long long int* a, long long int* b,long long int length)
+void sortDivide(long long int* z, long long int* a, long long int* b,int length)
 {
-	printf("\nBefore S&D:(Length=%lld):",length);
+if(err)
+	printf("\nBefore S&D:(Length=%d):",length);
+if(err)
 	pv(z, length);
 	localSort(z, length);
 	//a = malloc((length/2) * sizeof(long long int));
@@ -253,25 +310,33 @@ void sortDivide(long long int* z, long long int* a, long long int* b,long long i
 	
 
 
+if(err)
 	printf("After S&D(BOTH):");
+if(err)
 	pv(z,length);
+if(err)
 	printf("After S&D(1st 1/2):");
+if(err)
 	pv(a, length/2);
+if(err)
 	printf("After S&D(2nd 1/2):");
+if(err)
 	pv(b, length/2);
+if(err)
 	printf("\n");
 }
 
 
 
-void receiveVector(int k, long long int* vector) {
+void receiveVector(int source, int k, long long int* vector) {
    MPI_Status status;
    //vector = (long long int*)malloc(k * sizeof(long long int));
-   MPI_Recv(vector, k, MPI_LONG_LONG_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+   MPI_Recv(vector, k, MPI_LONG_LONG_INT, source, 0, MPI_COMM_WORLD, &status);
 }
 
 void sendVector(int sendTo, int k, long long int* vector){
- MPI_Send(vector, k, MPI_LONG_LONG_INT, sendTo, 0, MPI_COMM_WORLD);//TODO double check 0 argument & above)
+
+	MPI_Send(vector, k, MPI_LONG_LONG_INT, sendTo, 0, MPI_COMM_WORLD);//TODO double check 0 argument & above)
 }
 void dbg(char* in, int rank)
 {
@@ -288,7 +353,7 @@ void p(char* in)
 {
 	dbg(in, 0);
 }
-void pv(long long int* v, long long int l)
+void pv(long long int* v, int l)
 {
 	long long int i;
 	printf("[ ");
@@ -323,7 +388,7 @@ int main(int argc, char *argv[])
 	long long int size;// = n, the total number of numbers to be sorted, also the size of all localData concatenated
 //	long long int maxVal = LLONG_MAX; //The largest value that any n can obtain
 
-	long long int mySize;
+	int mySize;
 	long long int scale;// n/p = n's per p
 
 
@@ -360,8 +425,10 @@ int main(int argc, char *argv[])
 		//scanf("%lld", &maxVal);
     }
 
+if(err)
 	printf("P%d start 1st Bcast\n", myRank);
 	MPI_Bcast(&type, 1, MPI_INT, 0, MPI_COMM_WORLD);//PSOE from MPI_INT being used to represent a bool
+if(err)
 	printf("P%d start 2nd Bcast\n", myRank);
     MPI_Bcast(&size, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
 	//MPI_Bcast(&maxVal, 1, MPI_LONG_LONG_INT, 0, MPI_COMM_WORLD);
@@ -373,7 +440,7 @@ int main(int argc, char *argv[])
 	sleep(myRank % 3);//So as to get different seeds
 	srand(time(NULL));
     	startwtime = MPI_Wtime();
-	printf("Started clock,P%d,mySize:%lld\n", myRank,mySize);
+	printf("Started clock,P%d,mySize:%d\n", myRank,mySize);
 
 	//Since scale doesnt deal with remainders, the next length of all localData's will only = size if size % totalprocs == 0
 
@@ -385,9 +452,11 @@ int main(int argc, char *argv[])
     		int i;
 		long long int buff;
     		for (i = 0; i < mySize; i++) {
-			//buff = LLONG_MAX * rand();
-			buff = rand() % 100;
-			printf("%d/%d:%lld\n",i,mySize,buff);
+			buff = rand() % LLONG_MAX;
+			//buff = ((totalprocs - myRank) * mySize) + i;
+
+if(err)
+			printf("P%d:%d/%d:%lld\n",myRank,i,mySize,buff);
 			localData[i] = buff;
     		}
 
@@ -405,20 +474,22 @@ int main(int argc, char *argv[])
 		long long int buff;
 		int i;
 		for(i = start; i < end; i++){
-			buff = start + ((end - start) * rand());
+			buff = start + ( rand() % mySize) % LLONG_MAX;
+if(err)
 			printf("P%d:%d/%lld:%lld\n",myRank,i,end,buff);
 			localData[i] = buff;
 		}
 	}
+if(err)
 	dbg("Done gen lists",0);
-	printf("List right after gen:\n");
+	printf("P%d list right after gen:\n", myRank);
 	pv(localData, mySize);
 	int cycles = 0;
 	while(cycles < totalprocs) 
 	{
-		printf("Rank:%d Cycle:%d/%d\n", myRank, cycles, totalprocs);
+		printf("\nRank:%d entering cycle:%d/%d\n", myRank, cycles, totalprocs);
 		oddUp = cycles % 2;
-		transfer(myRank, mySize, oddUp, cap, odd, localData);
+		transfer(myRank, mySize, cycles, cap, odd, localData);
 		cycles++;
 
 	}
@@ -428,6 +499,7 @@ int main(int argc, char *argv[])
 
 	if(myRank == 0)
 	{
+if(err)
 		printf("\nSize of allSize:%lld\n", allSize);
 
 		allBuf = (long long int*)malloc(allSize * sizeof(long long int));
@@ -438,19 +510,38 @@ int main(int argc, char *argv[])
 	if(myRank == 0)
 	{
 		long long int i;
-		printf("First 50 values: ");
-		for(i = 0; i < 50 && i < allSize; i++)
+		if(allSize < 51)
 		{
-			printf("%lld, ",allBuf[i]);
+			printf("Not more than 50 values: [ ");
+			for(i = 0; i < allSize; i++)
+			{
+				printf("%lld ", allBuf[i]);
+			}
+			printf("]\n");	
 		}
-		printf("\nLast 50 values: \n");
-		{
+		else
+		{	
+		
+			
+			printf("First 50 values: [ ");
+			for(i = 0; i < 50 && i < allSize; i++)
+			{
+				printf("%lld ",allBuf[i]);
+			}
+			printf("]\nLast 50 values: [");
+			
 			for(i = allSize - 50; i < allSize && i > 0; i++)
 			{
-				printf("%lld, ", allBuf[i]);
-			}
+				printf("%lld ", allBuf[i]);
+			}	
+			printf("]\n");
 		}
+
 	}
+
+
+
+
 
 
 
